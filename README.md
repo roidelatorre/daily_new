@@ -34,3 +34,14 @@ Monthly finance review first Monday #Personal
 ```
 
 All data stays in the browser under `today-os-m3`.
+
+## Deploy to Vercel
+
+This package is configured for Vercel and does not require Vite.
+
+- Build command: `npm run build`
+- Output directory: `dist`
+- Install command: leave as default
+- Framework preset: `Other`
+
+You can import the repository or upload this folder to Vercel. The included `vercel.json` supplies the build settings automatically.
