@@ -30,3 +30,11 @@ Vercel settings:
 - Output directory: `dist`
 
 Your saved app data remains in browser `localStorage`; updating the deployment does not erase it when the domain stays the same.
+
+
+## Must remember
+
+- Click the star beside any task, meeting, follow-up, or reminder to pin it.
+- Pinned items appear in the highlighted **Must remember** area above the workspace.
+- In quick capture, start with `!`, `important`, or `urgent` to create a pinned item immediately.
+- Example: `! don't forget school paperwork`.

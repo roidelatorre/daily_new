@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   Archive,
+  BellRing,
   CalendarDays,
   Check,
   ChevronRight,
@@ -14,6 +15,7 @@ import {
   RotateCcw,
   Search,
   Sparkles,
+  Star,
   Sun,
   Upload,
   X,
@@ -41,7 +43,10 @@ function normalize(raw = {}) {
   return {
     ...defaultData,
     ...raw,
-    reminders: raw.reminders || raw.personal || [],
+    tasks: (raw.tasks || []).map((item) => ({ ...item, important: Boolean(item.important) })),
+    meetings: (raw.meetings || []).map((item) => ({ ...item, important: Boolean(item.important) })),
+    followups: (raw.followups || []).map((item) => ({ ...item, important: Boolean(item.important) })),
+    reminders: (raw.reminders || raw.personal || []).map((item) => ({ ...item, important: Boolean(item.important) })),
     journals: raw.journals || (raw.notes ? { [iso()]: { wins: '', challenges: '', ideas: raw.notes, tomorrow: '' } } : {}),
     settings: { ...defaultData.settings, ...(raw.settings || {}) },
   };
@@ -92,14 +97,19 @@ function CheckButton({ checked, onClick, label }) {
   );
 }
 
-function Row({ children, done, onToggle, onDelete, meta, right }) {
+function Row({ children, done, onToggle, onDelete, meta, right, important, onImportant }) {
   return (
-    <div className={`row ${done ? 'done' : ''}`}>
+    <div className={`row ${done ? 'done' : ''} ${important ? 'important-row' : ''}`}>
       {onToggle ? <CheckButton checked={done} onClick={onToggle} label={done ? 'Mark incomplete' : 'Mark complete'} /> : <span className="row-dot" />}
       <div className="row-copy">
         <div className="row-title">{children}</div>
         {meta ? <div className="row-meta">{meta}</div> : null}
       </div>
+      {onImportant ? (
+        <button type="button" className={`important-button ${important ? 'active' : ''}`} onClick={onImportant} aria-label={important ? 'Remove from must remember' : 'Mark as must remember'} title={important ? 'Must remember' : 'Mark important'}>
+          <Star size={15} fill={important ? 'currentColor' : 'none'} />
+        </button>
+      ) : null}
       {right}
       {onDelete ? (
         <button type="button" className="icon-button delete-button" onClick={onDelete} aria-label="Delete">
@@ -152,54 +162,63 @@ function App() {
   const upcoming = useMemo(() => [...data.meetings].filter((meeting) => meeting.date >= iso()).sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)).slice(0, 7), [data.meetings]);
   const openFollowups = useMemo(() => data.followups.filter((item) => !item.done).sort((a, b) => daysOld(b.since) - daysOld(a.since)), [data.followups]);
   const openReminders = useMemo(() => data.reminders.filter((item) => !item.done), [data.reminders]);
+  const mustRemember = useMemo(() => [
+    ...data.tasks.filter((item) => item.important && !item.done).map((item) => ({ ...item, collection: 'tasks', label: item.title, kind: 'Task' })),
+    ...data.followups.filter((item) => item.important && !item.done).map((item) => ({ ...item, collection: 'followups', label: `${item.person} — ${item.topic}`, kind: 'Waiting' })),
+    ...data.reminders.filter((item) => item.important && !item.done).map((item) => ({ ...item, collection: 'reminders', label: item.title, kind: 'Reminder' })),
+    ...data.meetings.filter((item) => item.important && item.date >= iso()).map((item) => ({ ...item, collection: 'meetings', label: item.title, kind: 'Meeting' })),
+  ].slice(0, 6), [data]);
   const journal = data.journals[iso()] || { wins: '', challenges: '', ideas: '', tomorrow: '' };
   const focusTask = data.tasks.find((task) => task.id === focusTaskId) || todayTasks[0];
 
   const updateCollection = (name, fn) => setData((current) => ({ ...current, [name]: fn(current[name]) }));
   const remove = (name, id) => updateCollection(name, (items) => items.filter((item) => item.id !== id));
   const toggle = (name, id) => updateCollection(name, (items) => items.map((item) => item.id === id ? { ...item, done: !item.done } : item));
+  const toggleImportant = (name, id) => updateCollection(name, (items) => items.map((item) => item.id === id ? { ...item, important: !item.important } : item));
 
-  function addTask(title, date = iso()) {
-    updateCollection('tasks', (items) => [...items, { id: uid(), title, date, done: false }]);
+  function addTask(title, date = iso(), important = false) {
+    updateCollection('tasks', (items) => [...items, { id: uid(), title, date, done: false, important }]);
   }
-  function addWaiting(value) {
+  function addWaiting(value, important = false) {
     const [person, ...topic] = value.split(/\s*[—:|-]\s*/);
-    updateCollection('followups', (items) => [...items, { id: uid(), person: person || 'Someone', topic: topic.join(' — ') || 'Follow up', since: iso(), done: false }]);
+    updateCollection('followups', (items) => [...items, { id: uid(), person: person || 'Someone', topic: topic.join(' — ') || 'Follow up', since: iso(), done: false, important }]);
   }
-  function addReminder(title) {
-    updateCollection('reminders', (items) => [...items, { id: uid(), title, date: iso(), done: false }]);
+  function addReminder(title, important = false) {
+    updateCollection('reminders', (items) => [...items, { id: uid(), title, date: iso(), done: false, important }]);
   }
 
   function parseCapture(raw) {
     const value = raw.trim();
     if (!value) return;
-    const lower = value.toLowerCase();
+    const important = /^!|^important\b|^urgent\b/i.test(value);
+    const cleanValue = value.replace(/^!\s*|^(important|urgent)[:\s-]*/i, '').trim();
+    const lower = cleanValue.toLowerCase();
     if (lower === 'focus') {
       startFocus();
       return;
     }
     if (lower.startsWith('waiting ') || lower.startsWith('waiting for ')) {
-      addWaiting(value.replace(/^waiting(?: for)?\s+/i, ''));
+      addWaiting(cleanValue.replace(/^waiting(?: for)?\s+/i, ''), important);
       return;
     }
-    if (/^(remember|remind me|don['’]?t forget)/i.test(value)) {
-      addReminder(value.replace(/^(remember|remind me|don['’]?t forget)\s*/i, ''));
+    if (/^(remember|remind me|don['’]?t forget)/i.test(cleanValue)) {
+      addReminder(cleanValue.replace(/^(remember|remind me|don['’]?t forget)\s*/i, ''), important);
       return;
     }
-    const tomorrow = /\btomorrow\b/i.test(value);
-    const meetingLike = /\b(meeting|interview|call|sync|review|appointment)\b/i.test(value);
-    const time = value.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
+    const tomorrow = /\btomorrow\b/i.test(cleanValue);
+    const meetingLike = /\b(meeting|interview|call|sync|review|appointment)\b/i.test(cleanValue);
+    const time = cleanValue.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
     if (meetingLike && (tomorrow || time)) {
       const date = new Date();
       if (tomorrow) date.setDate(date.getDate() + 1);
       let hour = time ? Number(time[1]) : 9;
       const minute = time?.[2] ? Number(time[2]) : 0;
       if (time?.[3]?.toLowerCase() === 'pm' && hour < 12) hour += 12;
-      const title = value.replace(/\btomorrow\b/ig, '').replace(time?.[0] || '', '').trim() || 'Meeting';
-      updateCollection('meetings', (items) => [...items, { id: uid(), title, date: iso(date), time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`, objective: '' }]);
+      const title = cleanValue.replace(/\btomorrow\b/ig, '').replace(time?.[0] || '', '').trim() || 'Meeting';
+      updateCollection('meetings', (items) => [...items, { id: uid(), title, date: iso(date), time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`, objective: '', important }]);
       return;
     }
-    addTask(value);
+    addTask(cleanValue, iso(), important);
   }
 
   function submitCapture() {
@@ -313,16 +332,38 @@ function App() {
 
         <div className="capture-wrap">
           <Plus size={19} />
-          <input ref={captureRef} value={capture} onChange={(e) => setCapture(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitCapture()} placeholder="Add anything… task, meeting tomorrow 10, waiting for Tom" />
+          <input ref={captureRef} value={capture} onChange={(e) => setCapture(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitCapture()} placeholder="Add anything… use ! for must remember" />
           <button onClick={submitCapture}>Add</button>
         </div>
+        <div className="capture-hint"><Star size={12} /> Start with <kbd>!</kbd> or click a star to pin something above everything else.</div>
+
+        {mustRemember.length ? (
+          <section className="must-remember">
+            <div className="must-remember-head">
+              <div className="must-icon"><BellRing size={18} /></div>
+              <div>
+                <span>Must remember</span>
+                <strong>{mustRemember.length === 1 ? 'One thing needs your attention' : `${mustRemember.length} things need your attention`}</strong>
+              </div>
+            </div>
+            <div className="must-list">
+              {mustRemember.map((item) => (
+                <button key={`${item.collection}-${item.id}`} className="must-item" onClick={() => toggleImportant(item.collection, item.id)}>
+                  <span className="must-kind">{item.kind}</span>
+                  <span>{item.label}</span>
+                  <Star size={14} fill="currentColor" />
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <div className="content-grid">
           <div className="main-column">
             <Section title="Today" meta={`${todayTasks.length} open`}>
               <>
                 {todayTasks.length ? todayTasks.map((task) => (
-                  <Row key={task.id} done={task.done} onToggle={() => toggle('tasks', task.id)} onDelete={() => remove('tasks', task.id)} right={<button className="row-action" onClick={() => startFocus(task.id)} aria-label="Focus on task"><ChevronRight size={16} /></button>}>
+                  <Row key={task.id} done={task.done} important={task.important} onImportant={() => toggleImportant('tasks', task.id)} onToggle={() => toggle('tasks', task.id)} onDelete={() => remove('tasks', task.id)} right={<button className="row-action" onClick={() => startFocus(task.id)} aria-label="Focus on task"><ChevronRight size={16} /></button>}>
                     {task.title}
                   </Row>
                 )) : <Empty>Your day is clear. Add one meaningful priority.</Empty>}
@@ -331,7 +372,7 @@ function App() {
 
             <Section title="Next" meta="upcoming" action={<button className="text-button" onClick={() => setMeetingOpen(true)}><Plus size={15} /> meeting</button>}>
               {upcoming.length ? upcoming.map((meeting) => (
-                <Row key={meeting.id} onDelete={() => remove('meetings', meeting.id)} meta={meeting.objective} right={<div className="event-time"><strong>{meeting.date === iso() ? meeting.time : shortDate(meeting.date)}</strong><span>{meeting.date === iso() ? 'today' : meeting.time}</span></div>}>
+                <Row key={meeting.id} important={meeting.important} onImportant={() => toggleImportant('meetings', meeting.id)} onDelete={() => remove('meetings', meeting.id)} meta={meeting.objective} right={<div className="event-time"><strong>{meeting.date === iso() ? meeting.time : shortDate(meeting.date)}</strong><span>{meeting.date === iso() ? 'today' : meeting.time}</span></div>}>
                   {meeting.title}
                 </Row>
               )) : <Empty>No upcoming meetings.</Empty>}
@@ -340,7 +381,7 @@ function App() {
             <Section title="Waiting" meta={`${openFollowups.length} open`}>
               <>
                 {openFollowups.length ? openFollowups.map((item) => (
-                  <Row key={item.id} done={item.done} onToggle={() => toggle('followups', item.id)} onDelete={() => remove('followups', item.id)} meta={`${daysOld(item.since)} day${daysOld(item.since) === 1 ? '' : 's'} waiting`} right={daysOld(item.since) >= 4 ? <span className="stale-pill">stale</span> : null}>
+                  <Row key={item.id} done={item.done} important={item.important} onImportant={() => toggleImportant('followups', item.id)} onToggle={() => toggle('followups', item.id)} onDelete={() => remove('followups', item.id)} meta={`${daysOld(item.since)} day${daysOld(item.since) === 1 ? '' : 's'} waiting`} right={daysOld(item.since) >= 4 ? <span className="stale-pill">stale</span> : null}>
                     {item.person} — {item.topic}
                   </Row>
                 )) : <Empty>Nothing is waiting on someone else.</Empty>}
@@ -350,7 +391,7 @@ function App() {
             <Section title="Do not forget" meta={`${openReminders.length} open`}>
               <>
                 {openReminders.length ? openReminders.map((item) => (
-                  <Row key={item.id} done={item.done} onToggle={() => toggle('reminders', item.id)} onDelete={() => remove('reminders', item.id)}>
+                  <Row key={item.id} done={item.done} important={item.important} onImportant={() => toggleImportant('reminders', item.id)} onToggle={() => toggle('reminders', item.id)} onDelete={() => remove('reminders', item.id)}>
                     {item.title}
                   </Row>
                 )) : <Empty>Nothing important is being held in your head.</Empty>}
@@ -473,7 +514,7 @@ function MeetingModal({ onClose, onSave }) {
       </div>
       <div className="modal-actions">
         <button className="secondary-button" onClick={onClose}>Cancel</button>
-        <button className="primary-button" disabled={!title.trim()} onClick={() => onSave({ id: uid(), title: title.trim(), date, time, objective: objective.trim() })}>Save meeting</button>
+        <button className="primary-button" disabled={!title.trim()} onClick={() => onSave({ id: uid(), title: title.trim(), date, time, objective: objective.trim(), important: false })}>Save meeting</button>
       </div>
     </Modal>
   );
