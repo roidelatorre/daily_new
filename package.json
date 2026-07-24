@@ -1,8 +1,8 @@
 {
-  "name": "today-os-milestone-3",
-  "version": "3.0.0",
+  "name": "today-os-milestone-3-indexeddb",
+  "version": "3.1.0",
   "private": true,
-  "description": "Today OS Milestone 3 — local-first personal operating system",
+  "description": "Today OS Milestone 3 with IndexedDB persistence",
   "scripts": {
     "dev": "node server.js",
     "build": "node build.js"

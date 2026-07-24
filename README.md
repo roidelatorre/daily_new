@@ -1,47 +1,53 @@
-# Today OS — Milestone 3
+# Today OS — Milestone 3 IndexedDB Edition
 
-A local-first personal operating system built on Milestones 1 and 2.
+A Vercel-ready, local-first personal operating system.
 
-## Run
+## Storage
 
-Open `index.html`, or run `python3 -m http.server 8080` in this folder.
+This edition stores the application state in the browser's **IndexedDB** database:
 
-## Milestone 3 additions
+- Database: `today-os-db`
+- Object store: `app_state`
+- Record: `current`
 
-- Unified entity model: tasks, meetings, waiting items, notes, and ideas
-- Daily Brief with smart metrics and suggestions
-- Chronological Timeline view
-- Full month Calendar with drag-and-drop rescheduling
-- Real project workspaces
-- People relationships using `@Name`
-- Notes and Ideas view
-- Advanced recurring rules: weekdays, every N weeks, first Monday, last Friday
-- Raycast-style command palette
-- Multiple themes: Linear, GitHub, Raycast, Terminal
-- Focus mode with timer
-- Local JSON import/export
-- Automatic migration from Milestone 1 and 2 storage
+On first launch, the app automatically checks the previous keys:
 
-## Capture examples
+- `today-os-m3`
+- `today-os-m2`
+- `today-os-m1`
+
+When legacy data exists, it is copied into IndexedDB automatically. The original localStorage value is left intact as a safety backup.
+
+The app also asks the browser for persistent storage when supported. Browser policies still apply: data may be removed when the user clears site data, uses private browsing, or accesses the app from a different browser, device, or domain.
+
+Use **Cmd/Ctrl + K → Storage status** to see IndexedDB usage and whether persistent storage was granted.
+
+## Vercel deployment
+
+Use these settings:
 
 ```text
-! Prepare Haven interview tomorrow #Haven @Taek
-meeting Product review Friday 3pm #Work @Laura
-waiting for Taek in 3 days #Haven @Taek
-note Pricing strategy ideas #OMS
-Review metrics every weekday #Work
-Monthly finance review first Monday #Personal
+Framework Preset: Other
+Build Command: npm run build
+Output Directory: dist
 ```
 
-All data stays in the browser under `today-os-m3`.
+The included `vercel.json` normally configures this automatically.
 
-## Deploy to Vercel
+## Local development
 
-This package is configured for Vercel and does not require Vite.
+```bash
+npm run dev
+```
 
-- Build command: `npm run build`
-- Output directory: `dist`
-- Install command: leave as default
-- Framework preset: `Other`
+Then open `http://localhost:3000`.
 
-You can import the repository or upload this folder to Vercel. The included `vercel.json` supplies the build settings automatically.
+## Build
+
+```bash
+npm run build
+```
+
+## Backup
+
+Use the command palette to export data to JSON. IndexedDB is durable browser storage, but JSON exports remain the safest portable backup.
