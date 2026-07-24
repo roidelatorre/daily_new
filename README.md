@@ -1,13 +1,36 @@
-# Today — Personal Planner
+# Today OS — Milestone 3
 
-A private, one-page planner for tasks, future notes, work, personal reminders, meetings, follow-ups, focus sessions, and archived history.
+A local-first personal operating system built on Milestones 1 and 2.
 
-## Deploy on Vercel
+## Run
 
-1. Upload this folder to GitHub.
-2. Import the repository in Vercel.
-3. Framework preset: Vite.
-4. Build command: `npm run build`.
-5. Output directory: `dist`.
+Open `index.html`, or run `python3 -m http.server 8080` in this folder.
 
-Data is stored in your browser using localStorage. Use Export regularly for a portable JSON backup.
+## Milestone 3 additions
+
+- Unified entity model: tasks, meetings, waiting items, notes, and ideas
+- Daily Brief with smart metrics and suggestions
+- Chronological Timeline view
+- Full month Calendar with drag-and-drop rescheduling
+- Real project workspaces
+- People relationships using `@Name`
+- Notes and Ideas view
+- Advanced recurring rules: weekdays, every N weeks, first Monday, last Friday
+- Raycast-style command palette
+- Multiple themes: Linear, GitHub, Raycast, Terminal
+- Focus mode with timer
+- Local JSON import/export
+- Automatic migration from Milestone 1 and 2 storage
+
+## Capture examples
+
+```text
+! Prepare Haven interview tomorrow #Haven @Taek
+meeting Product review Friday 3pm #Work @Laura
+waiting for Taek in 3 days #Haven @Taek
+note Pricing strategy ideas #OMS
+Review metrics every weekday #Work
+Monthly finance review first Monday #Personal
+```
+
+All data stays in the browser under `today-os-m3`.
